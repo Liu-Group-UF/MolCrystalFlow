@@ -1,4 +1,4 @@
-# Crystal Structure Prediction Pipeline Demo
+# Crystal Structure Prediction Pipeline
 
 This directory contains a complete pipeline for molecular crystal structure prediction using MolCrystalFlow, UMA-OMC relaxation, and DFT validation.
 
@@ -242,20 +242,3 @@ Core packing generation logic:
 - MolCrystalFlow model checkpoint
 - UMA-OMC model (via fairchem)
 - VASP 6.x with D3/MBD support
-
-## Completed Features
-
-- [x] High-level pipeline orchestrator (csp_pipeline.py)
-- [x] Modular packing generation (molcrystalflow-gen/)
-- [x] Formula-aware output organization
-- [x] Full index tracking through pipeline
-- [x] DFT result collection with structure extraction
-- [x] Stability ranking plots with ground-truth energies
-- [x] Molecule unwrapping in output XYZ files
-
-## TODO
-
-- [ ] Automatic structure deduplication across Z values
-- [ ] RMSD-based clustering of final structures
-- [ ] Integration with CIF database comparison
-- [ ] Parallel DFT job submission with dependency management
