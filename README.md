@@ -188,7 +188,7 @@ python -m molcrystalflow.experiments.run_lattice_volume_analysis \
 
 ## CSP Pipeline
 
-> **Note:**Crystal structure prediction pipeline workflows are documented in the `csp-pipeline/` folder.
+> Note:Crystal structure prediction pipeline workflows are documented in the `csp-pipeline/` folder.
 
 ## Citation
 
