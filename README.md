@@ -7,56 +7,16 @@
 </p>
 
 ## Table of Contents
-- [Package Structure & Usage](#package-structure--usage)
-- [Repository Guide](#repository-guide)
-- [Hydra Config Override Best Practices](#hydra-config-override-best-practices)
 - [Installation](#installation)
-  - [Setup environment](#setup-environment)
 - [Dataset & checkpoints](#dataset--checkpoints)
 - [Training](#training)
-  - [Resume training from checkpoint](#resume-training-from-checkpoint)
 - [Inference](#inference)
 - [Analysis](#analysis)
   - [Structure Matching](#structure-matching)
   - [Lattice Volume Comparison](#lattice-volume-comparison)
+- [CSP Pipeline](#csp-pipeline)
 - [Citation](#citation)
 - [Acknowledgements](#acknowledgement)
-
----
-
-## Package Structure & Usage
-
-All core source code is now under the `molcrystalflow/` package. Scripts are run using the `python -m molcrystalflow.experiments.*` style from the project root. All imports use the `molcrystalflow.*` namespace.
-
-**Example:**
-```python
-python -m molcrystalflow.experiments.inference --config-name=inference.yaml ...
-```
-
-> **Note:** Do not set `PYTHONPATH` manually. Always run commands from the project root.
-
----
-
-## Repository Guide
-
-- Data preprocessing workflows and dataset-specific preparation steps are documented in the `data-preprocess/` folder.
-- Crystal structure prediction pipeline workflows are documented in the `csp-pipeline/` folder.
-
----
-
-## Hydra Config Override Best Practices
-MolCrystalFlow uses [Hydra](https://hydra.cc/) for configuration management. To override config values from the command line:
-- Use `key=value` for existing keys.
-- Use `+key=value` to add new keys not present in the config.
-- For nested configs, use dot notation (e.g., `experiment.wandb.name=...`).
-
-**Example:**
-```python
-python -m molcrystalflow.experiments.train --config-name=molcrystal.yaml \
-    experiment.wandb.name=<experiment_name> \
-    experiment.trainer.max_epochs=300 \
-    data.cache_dir=./data-preprocess/thurlemann23/preprocessed/normalized
-```
 
 ---
 
@@ -76,6 +36,8 @@ mamba activate molcrystalflow
 ```
 
 ## Dataset & checkpoints
+
+> **Note:** Data preprocessing workflows and dataset-specific preparation steps are documented in the `data-preprocess/` folder.
 
 Pre-trained model checkpoints with the lowest validation losses are available in the `model-checkpoints/` directory:
 - `model-checkpoints/thurlemann23/` - Trained on Thürlemann dataset
@@ -118,10 +80,10 @@ python -m molcrystalflow.experiments.train \
 ### Quick Start
 
 ```python
-# Run inference with the Thürlemann checkpoint model
+# Run inference with a trained checkpoint
 python -m molcrystalflow.experiments.inference \
     --config-name=inference.yaml \
-    inference.ckpt_path=./model-checkpoints/thurlemann23/best.pt \
+    inference.ckpt_path=<path/to/checkpoint.ckpt> \
     data.cache_dir=./data-preprocess/thurlemann23/preprocessed/normalized \
     interpolant.sampling.num_timesteps=50 \
     interpolant.rots.exp_rate=3 \
@@ -223,6 +185,10 @@ python -m molcrystalflow.experiments.run_lattice_volume_analysis \
     --num_samples 10 \
     --kde_cmap plasma
 ```
+
+## CSP Pipeline
+
+> **Note:**Crystal structure prediction pipeline workflows are documented in the `csp-pipeline/` folder.
 
 ## Citation
 
