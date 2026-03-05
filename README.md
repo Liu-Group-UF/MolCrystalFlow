@@ -37,6 +37,8 @@ mamba activate molcrystalflow
 
 ## Dataset & checkpoints
 
+Raw and preprocessed data and model checkpoints can be downloaded from [zenodo](https://zenodo.org/records/18879915).
+
 > **Note:** Data preprocessing workflows and dataset-specific preparation steps are documented in the `data-preprocess/` folder.
 
 Pre-trained model checkpoints with the lowest validation losses are available in the `model-checkpoints/` directory:
