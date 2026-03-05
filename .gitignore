@@ -11,3 +11,8 @@ __pycache__
 *.zip
 *.tar
 **/.ipynb_checkpoints/
+*.png
+*.jpg
+*.jpeg
+*.tiff
+*.pdf
