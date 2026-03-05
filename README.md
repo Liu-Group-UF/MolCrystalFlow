@@ -248,7 +248,7 @@ If you use the OMC-MCF dataset, please cite:
 }
 ```
 
-> **License:** The OMC25 dataset is provided under a [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) license (Creative Commons Attribution 4.0 International).
+> **License:** The OMC25 dataset is provided under a [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) license (Creative Commons Attribution 4.0 International). Original raw ase-db OMC25 data can be found at [huggingface](https://huggingface.co/datasets/facebook/OMC25) 
 
 ## Acknowledgements
 MolCrystalFlow builds upon the following projects:
