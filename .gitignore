@@ -1,3 +1,5 @@
 *.xyz
 *.extxyz
 *.hdf5
+*.ckpt
+*.pt
