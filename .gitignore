@@ -3,3 +3,10 @@
 *.hdf5
 *.ckpt
 *.pt
+__pycache__
+*.npy
+*.csv
+*.log
+*.pkl.gz
+*.zip
+*.tar
