@@ -1,0 +1,18 @@
+# Configuration for inference
+defaults:
+  - omc25_molcrystal
+  - _self_
+  - omc25_paths
+
+inference:
+  inference_dir: ../inference_outputs
+  name: omc25_molcrystal_inference
+  seed: 123
+  task: null
+  # To override output directory, use: inference.output_dir=[path]
+  output_dir: ./inference_outputs/
+  ckpt_path: ${paths.ckpt_dir}/last.ckpt
+  use_gpu: True
+  num_gpus: 1
+  num_samples: 1
+  save_trajectories: True

@@ -1,0 +1,60 @@
+name: molcrystalflow
+channels:
+  - nvidia/label/cuda-12.8.1
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  # Core Python and CUDA
+  - python=3.12
+  - nvidia/label/cuda-12.8.1::cuda-toolkit
+  - pip
+    
+  # Pip dependencies
+  - pip:
+    # PyTorch ecosystem (CUDA 12.8 compatible)
+    - torch==2.7.1 --index-url https://download.pytorch.org/whl/cu128
+    - torchvision==0.22.1 --index-url https://download.pytorch.org/whl/cu128
+    - torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu128
+    
+    # PyTorch Geometric ecosystem
+    - --find-links https://data.pyg.org/whl/torch-2.7.0%2Bcu128.html
+    - torch-geometric
+    - torch-cluster
+    - torch_scatter
+    
+    # Machine Learning frameworks
+    - pytorch-lightning>=2.5.0
+    
+    # Configuration and experiment tracking
+    - hydra-core>=1.3.0
+    - omegaconf>=2.3.0
+    - wandb
+    
+    # Chemistry and molecular libraries
+    - rdkit>=2025.3.0
+    - ase>=3.22.0
+    - pymatgen>=2025.1.0
+    - spglib>=2.0.0
+    
+    # Scientific computing
+    - numpy>=2.0.0
+    - scipy>=1.10.0
+    - pandas>=2.0.0
+    - matplotlib>=3.8.0
+    - plotly>=5.0.0
+    
+    # Utility libraries
+    - networkx>=3.0
+    - h5py>=3.10.0
+    - p_tqdm>=1.4.0
+    - tqdm>=4.60.0
+    - rich>=13.0.0
+    - GPUtil>=1.4.0
+    - seaborn
+    
+    # Local package (install in development mode)
+    - -e .
+
+# Optional: For data preprocessing only (not needed for training/inference)
+# Install separately with: conda install -c conda-forge openbabel
