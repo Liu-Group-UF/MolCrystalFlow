@@ -59,7 +59,8 @@ python -m molcrystalflow.experiments.train \
 python -m molcrystalflow.experiments.train \
     --config-name=omc25_molcrystal.yaml \
     experiment.wandb.name=<experiment_name> \
-    experiment.trainer.max_epochs=300 \
+    experiment.trainer.max_epochs=500 \
+	model.bb_embedder.num_atom_types=12 \ 
     data.cache_dir=./data-preprocess/omc25-mcf/preprocessed/normalized
 ```
 
@@ -120,7 +121,6 @@ This script:
 1. Generates ground truth (`gt_*.xyz`) and predicted (`pred_*.xyz`) XYZ files
 2. Performs structure matching using pymatgen StructureMatcher
 3. Saves RMSD results to CSV and matching summary to JSON
-4. Optionally generates best-matched structure pairs
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
