@@ -185,13 +185,7 @@ NSW    = 1500
 
 ## SLURM Configuration
 
-Default settings (HiPerGator):
-- Account: `mingjieliu`
-- Time: 2 days (D3), 3 days (MBD)
-- Nodes: 1, Tasks: 32
-- Memory: 2gb per CPU
-
-Modify in `setup_dft_jobs.py` if needed.
+Modify SLURM headings in `setup_dft_jobs.py` if needed.
 
 ## Output CSV Columns
 
