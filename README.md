@@ -169,7 +169,7 @@ This script:
 python -m molcrystalflow.experiments.inference \
     --config-name=inference.yaml \
     experiment.ckpt_path=./model-checkpoints/thurlemann23/best.ckpt \
-    data.cache_dir=./data-preprocess/thurlemann23/preprocessed/final \
+    data.cache_dir=./data-preprocess/thurlemann23/preprocessed/normalized \
     inference.num_samples=10
 
 # 2. Run structure matching (generates XYZ files)
