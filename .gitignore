@@ -10,3 +10,4 @@ __pycache__
 *.pkl.gz
 *.zip
 *.tar
+**/.ipynb_checkpoints/
