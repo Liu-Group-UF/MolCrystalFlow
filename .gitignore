@@ -1,1 +1,3 @@
-data-preprocess/thurlemann23/*.hdf5
+*.xyz
+*.extxyz
+*.hdf5
