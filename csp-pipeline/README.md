@@ -52,10 +52,7 @@ csp-pipeline-demo/
 │   ├── relaxed_structures/      # Extracted DFT-relaxed structures
 │   ├── dft_combined_ranking.csv # Final ranking
 │   └── stability_ranking_<formula>.pdf
-│
-├── archive/                     # Archived old scripts
-│
-└── data-ana-and-viz/            # Analysis notebooks
+
 ```
 
 ## Quick Start
@@ -94,7 +91,7 @@ python csp_pipeline.py --formula C6H6 --collect_dft --plot
 python csp_pipeline.py \
     --xyz molecule.xyz \
     --z_values 2 4 \
-    --num_samples 500 \
+    --num_samples 100 \
     --axis_flip \
     --filter_overlap \
     --ckpt_path /path/to/molcrystalflow/checkpoint \
@@ -104,7 +101,7 @@ python csp_pipeline.py \
 python -m molcrystalflow_gen.packing_gen \
     --xyz molecule.xyz \
     --z_values 2 4 \
-    --num_samples 500 \
+    --num_samples 100 \
     --ckpt_path /path/to/checkpoint
 ```
 
@@ -169,7 +166,7 @@ python csp_pipeline.py \
 
 # Option 2: Step-by-step
 # 1. Generate structures
-python csp_pipeline.py --xyz molecule.xyz --z_values 2 4 --num_samples 500 \
+python csp_pipeline.py --xyz molecule.xyz --z_values 2 4 --num_samples 100 \
     --axis_flip --ckpt_path /path/to/ckpt --generate
 
 # 2. Relax with UMA-OMC
