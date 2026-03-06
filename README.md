@@ -235,7 +235,7 @@ If you use the Thürlemann dataset, please also cite:
 
 > **License:** The Thürlemann dataset is licensed under the [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) license (Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International). Original raw HDF data and the corresponding `README.md` can be retrieved from the [link](https://www.research-collection.ethz.ch/entities/researchdata/9e0da707-f519-475e-a1f3-60d51a64b039).
 
-If you use the OMC-MCF dataset, please cite:
+If you use the OMC25-MCF dataset, please cite:
 ```bibtex
 @misc{gharakhanyan2025_OMC25,
 	title = {Open {Molecular} {Crystals} 2025 ({OMC25}) {Dataset} and {Models}},
