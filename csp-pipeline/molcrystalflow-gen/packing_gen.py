@@ -658,8 +658,6 @@ def run_inference(
             results = model(
                 batch, 
                 num_timesteps=num_timesteps,
-                scaling=scaling,
-                exp_rate=exp_rate,
             )
 
         # Convert results to ASE Atoms
