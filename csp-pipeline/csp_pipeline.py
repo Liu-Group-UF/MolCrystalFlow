@@ -659,9 +659,9 @@ def run_full_pipeline(
     ckpt_path: str,
     output_dir: str = ".",
     z_values: List[int] = [2, 4],
-    num_samples: int = 1000,
+    num_samples: int = 100,
     axis_flip: bool = True,
-    filter_overlap: bool = True,
+    filter_overlap: bool = False,
     overlap_threshold: float = 0.05,
     formula: Optional[str] = None,
     # Relaxation settings
