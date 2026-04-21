@@ -37,13 +37,31 @@ mamba activate molcrystalflow
 
 ## Dataset & checkpoints
 
-Raw and preprocessed data and model checkpoints can be downloaded from [zenodo](https://zenodo.org/records/18879915).
+- All **preprocessed datasets** and **model checkpoints** are hosted on Zenodo: https://zenodo.org/records/19673190
+- Dataset-specific preprocessing scripts are in `data-preprocess/`.
 
-> **Note:** Data preprocessing pipeline is documented in the `data-preprocess/` folder.
+### Download preprocessed datasets
 
-Pre-trained model checkpoints with the lowest validation losses are available in the `model-checkpoints/` directory:
-- `model-checkpoints/thurlemann23/` - Trained on Thürlemann dataset
-- `model-checkpoints/omc25-mcf/` - Trained on OMC25-MCF dataset
+The two preprocessed datasets can be downloaded as ZIP archives:
+
+```bash
+mkdir -p checkpoints
+wget -P checkpoints/ https://zenodo.org/record/19673190/files/thurlemann23.zip
+wget -P checkpoints/ https://zenodo.org/record/19673190/files/omc25-mcf.zip
+```
+
+### Download model checkpoints
+
+```bash
+mkdir -p checkpoints
+wget -P checkpoints/ https://zenodo.org/record/19673190/files/model-checkpoints.zip
+```
+
+After downloading, unzip into the repository root, so the checkpoints live under `model-checkpoints/`.
+
+Pre-trained checkpoints with the lowest validation losses are provided in:
+- `model-checkpoints/thurlemann23/` - trained on the Thürlemann dataset
+- `model-checkpoints/omc25-mcf/` - trained on the OMC25-MCF dataset
 
 ## Training
 
@@ -51,14 +69,14 @@ Pre-trained model checkpoints with the lowest validation losses are available in
 
 ```python
 # Train on Thürlemann dataset
-python -m molcrystalflow.experiments.train \
+python molcrystalflow/experiments/train.py \
     --config-name=molcrystal.yaml \
     experiment.wandb.name=<experiment_name> \
     experiment.trainer.max_epochs=300 \
     data.cache_dir=./data-preprocess/thurlemann23/preprocessed/normalized
 
 # Train on OMC25-MCF dataset
-python -m molcrystalflow.experiments.train \
+python molcrystalflow/experiments/train.py \
     --config-name=omc25_molcrystal.yaml \
     experiment.wandb.name=<experiment_name> \
     experiment.trainer.max_epochs=500 \
@@ -71,7 +89,7 @@ python -m molcrystalflow.experiments.train \
 To continue training from `<ckpt_path>` in experiment `<expname>`
 
 ```python
-python -m molcrystalflow.experiments.train \
+python molcrystalflow/experiments/train.py \
     experiment.wandb.name=<expname> \
     experiment.warm_start=<ckpt_path> \
     +experiment.wandb.id=<run_id> \
@@ -84,7 +102,7 @@ python -m molcrystalflow.experiments.train \
 
 ```python
 # Run inference with a trained checkpoint
-python -m molcrystalflow.experiments.inference \
+python molcrystalflow/experiments/inference.py \
     --config-name=inference.yaml \
     inference.ckpt_path=<path/to/checkpoint.ckpt> \
     data.cache_dir=./data-preprocess/thurlemann23/preprocessed/normalized \
@@ -112,7 +130,7 @@ After inference completes, a `predictions_K.pt` file is generated in the `infere
 Evaluate generation qualtiy via `pymatgen`'s StructureMatcher:
 
 ```python
-python -m molcrystalflow.experiments.run_structure_matching \
+python molcrystalflow/experiments/run_structure_matching.py \
     --pt_file <path/to/predictions_K.pt> \
     --num_samples K \
     --stol 0.8 \
@@ -139,7 +157,7 @@ This script:
 Compare lattice volumes between ground truth and predicted structures:
 
 ```python
-python -m molcrystalflow.experiments.run_lattice_volume_analysis \
+python molcrystalflow/experiments/run_lattice_volume_analysis.py \
     --gt_file <path/to/gt_*.xyz> \
     --pred_file <path/to/pred_*.xyz> \
     --num_samples K \
@@ -168,20 +186,20 @@ This script:
 
 ```python
 # 1. Run inference
-python -m molcrystalflow.experiments.inference \
+python molcrystalflow/experiments/inference.py \
     --config-name=inference.yaml \
     experiment.ckpt_path=./model-checkpoints/thurlemann23/best.ckpt \
     data.cache_dir=./data-preprocess/thurlemann23/preprocessed/normalized \
     inference.num_samples=10
 
 # 2. Run structure matching (generates XYZ files)
-python -m molcrystalflow.experiments.run_structure_matching \
+python molcrystalflow/experiments/run_structure_matching.py \
     --pt_file ./model-checkpoints/thurlemann23/inference/predictions_10.pt \
     --num_samples 10 \
     --stol 0.8
 
 # 3. Run lattice volume analysis (with custom colormap)
-python -m molcrystalflow.experiments.run_lattice_volume_analysis \
+python molcrystalflow/experiments/run_lattice_volume_analysis.py \
     --gt_file ./model-checkpoints/thurlemann23/inference/gt_thurlemann23.xyz \
     --pred_file ./model-checkpoints/thurlemann23/inference/pred_thurlemann23.xyz \
     --num_samples 10 \
