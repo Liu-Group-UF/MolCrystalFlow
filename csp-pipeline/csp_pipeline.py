@@ -18,13 +18,13 @@ Usage:
   python csp_pipeline.py --xyz molecule.xyz --ckpt_path /path/to/checkpoint --generate
 
   # Step 2: Submit relaxation (after generation)
-  python csp_pipeline.py --formula C6H6 --relax
+  python csp_pipeline.py --formula C9H9N3O5 --relax
 
   # Step 3: Setup DFT jobs (after relaxation)
-  python csp_pipeline.py --formula C6H6 --setup_dft
+  python csp_pipeline.py --formula C9H9N3O5 --setup_dft
 
   # Step 4: Collect DFT results and rank (after DFT jobs complete)
-  python csp_pipeline.py --formula C6H6 --collect_dft --plot
+  python csp_pipeline.py --formula C9H9N3O5 --collect_dft --plot
 
 Output Structure:
   <formula>/
@@ -47,12 +47,15 @@ Output Structure:
 """
 
 import argparse
+import math
 import os
 import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+from ase.io import read
 
 # Add current directory to path for imports
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -168,82 +171,158 @@ def submit_relaxation(
 
     print(f"  Input: {xyz_file}")
     print(f"  Output: {results_dir}")
-    print(f"  Jobs: {num_jobs} × {structures_per_job} structures/job")
+    print(f"  Requested jobs: {num_jobs}")
+    print(f"  Structures/job: {structures_per_job}")
 
     # Path to relaxation pipeline script
     relax_script = SCRIPT_DIR / "uma-s1p1-omc-opt" / "run_relaxation_pipeline.py"
-    monitor_script = SCRIPT_DIR / "uma-s1p1-omc-opt" / "monitor_pipeline.py"
 
     if not relax_script.exists():
         raise FileNotFoundError(f"Relaxation script not found: {relax_script}")
 
-    # Build submission command
-    cmd = [
-        "python", str(relax_script),
-        "--input", str(xyz_file),
-        "--output_dir", str(results_dir),
-        "--num_jobs", str(num_jobs),
-        "--structures_per_job", str(structures_per_job),
-        "--conda_env", conda_env,
-        "--partition", partition,
-        "--time", time_limit,
-    ]
+    chunk_size = structures_per_job
+    input_structures = len(read(xyz_file, index=":"))
+    expected_rigid_chunks = math.ceil(input_structures / chunk_size)
+    xyz_file_for_relax = os.path.relpath(xyz_file, start=results_dir)
+
+    def _run_relax_step(args: List[str]) -> subprocess.CompletedProcess:
+        cmd = ["python", str(relax_script), *args]
+        print(f"  Command: {' '.join(cmd)}")
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=str(results_dir),
+        )
+        if result.stdout:
+            print(result.stdout)
+        if result.returncode != 0:
+            if result.stderr:
+                print(f"  Error: {result.stderr}")
+            else:
+                print("  Error: relaxation step failed")
+        elif result.stderr:
+            print(f"  Warnings: {result.stderr}")
+        return result
 
     print(f"\n  Submitting relaxation pipeline...")
-    print(f"  Command: {' '.join(cmd)}")
+    print(f"  Working directory: {results_dir}")
+    print(f"  Input structures: {input_structures}")
+    print(f"  Chunk size: {chunk_size}")
+    print(f"  Expected rigid-body jobs: {expected_rigid_chunks}")
+    if any([
+        num_jobs != expected_rigid_chunks,
+        conda_env != "uma-s1p1-mace-omc",
+        partition != "gpu",
+        time_limit != "24:00:00",
+    ]):
+        print(
+            "  Note: the current UMA-OMC relaxation CLI derives job counts from "
+            "chunk size and does not yet accept the high-level conda/partition/time overrides."
+        )
 
-    # Submit jobs
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"  Error submitting jobs: {result.stderr}")
-        return {"status": "error", "error": result.stderr}
-
-    print(result.stdout)
+    rigid_submit = _run_relax_step(
+        ["submit_rigid_body", "--input", xyz_file_for_relax, "--chunk_size", str(chunk_size)]
+    )
+    if rigid_submit.returncode != 0:
+        return {"status": "error", "error": rigid_submit.stderr}
 
     job_info = {
-        "status": "submitted",
+        "status": "rigid_body_submitted",
         "formula": formula,
         "input_file": str(xyz_file),
         "output_dir": str(results_dir),
-        "num_jobs": num_jobs,
+        "num_jobs": expected_rigid_chunks,
+        "requested_num_jobs": num_jobs,
+        "structures_per_job": structures_per_job,
     }
 
-    # Wait for completion if requested
-    if wait_for_completion:
-        print(f"\n  Waiting for jobs to complete (polling every {poll_interval}s)...")
-        job_info["status"] = _wait_for_relaxation_completion(
-            results_dir, poll_interval
-        )
+    if not wait_for_completion:
+        print("  Submitted rigid-body relaxation jobs.")
+        print("  Note: cell optimization is not submitted until rigid-body jobs finish.")
+        return job_info
+
+    print(f"\n  Waiting for rigid-body jobs to complete (polling every {poll_interval}s)...")
+    rigid_status = _wait_for_relaxation_completion(
+        results_dir=results_dir,
+        expected_chunks=expected_rigid_chunks,
+        pattern="opt-results/pred_omc25_100step_opt_*.extxyz",
+        stage_name="rigid-body",
+        poll_interval=poll_interval,
+    )
+    if rigid_status != "completed":
+        job_info["status"] = rigid_status
+        return job_info
+
+    combine_result = _run_relax_step(["combine_and_filter", "--min_dist", "1.0"])
+    if combine_result.returncode != 0:
+        return {"status": "error", "error": combine_result.stderr}
+
+    filtered_xyz = results_dir / "filtered_by_inter_bb.xyz"
+    if not filtered_xyz.exists():
+        return {
+            "status": "error",
+            "error": f"Filtered XYZ not found after combine_and_filter: {filtered_xyz}",
+        }
+
+    filtered_structures = len(read(filtered_xyz, index=":"))
+    if filtered_structures == 0:
+        return {
+            "status": "error",
+            "error": "No structures remained after rigid-body filtering.",
+        }
+    filtered_xyz_for_relax = os.path.relpath(filtered_xyz, start=results_dir)
+
+    expected_cell_chunks = math.ceil(filtered_structures / 10)
+    print(f"\n  Submitting cell optimization jobs...")
+    print(f"  Filtered structures: {filtered_structures}")
+    print(f"  Cell-opt chunk size: 10")
+    print(f"  Expected cell-opt jobs: {expected_cell_chunks}")
+
+    cell_submit = _run_relax_step(
+        ["submit_cell_opt", "--input", filtered_xyz_for_relax, "--chunk_size", "10"]
+    )
+    if cell_submit.returncode != 0:
+        return {"status": "error", "error": cell_submit.stderr}
+
+    print(f"\n  Waiting for cell-opt jobs to complete (polling every {poll_interval}s)...")
+    cell_status = _wait_for_relaxation_completion(
+        results_dir=results_dir,
+        expected_chunks=expected_cell_chunks,
+        pattern="cell-opt-results/pred_omc25_*step_cell_opt_*.extxyz",
+        stage_name="cell-opt",
+        poll_interval=poll_interval,
+    )
+    job_info["status"] = cell_status
+    job_info["filtered_structures"] = filtered_structures
+    job_info["cell_opt_jobs"] = expected_cell_chunks
+
+    if cell_status == "completed":
+        _run_relax_step(["combine_cell_opt"])
 
     return job_info
 
 
 def _wait_for_relaxation_completion(
-    results_dir: Path, poll_interval: int = 60
+    results_dir: Path,
+    expected_chunks: int,
+    pattern: str,
+    stage_name: str,
+    poll_interval: int = 60,
 ) -> str:
-    """Wait for relaxation jobs to complete."""
+    """Wait for chunked relaxation jobs to complete."""
     import glob
 
     while True:
-        # Check for completion marker
-        completion_file = results_dir / "relaxation_complete.txt"
-        if completion_file.exists():
-            print("  Relaxation complete!")
+        files = glob.glob(str(results_dir / pattern))
+        completed = len(files)
+        if completed >= expected_chunks:
+            print(f"  {stage_name} complete: {completed}/{expected_chunks} chunks found.")
             return "completed"
-
-        # Check for results CSV
-        results_csv = results_dir / "relaxation_results.csv"
-        if results_csv.exists():
-            # Check if jobs are still running
-            running_jobs = subprocess.run(
-                ["squeue", "-u", os.environ.get("USER", ""), "-h"],
-                capture_output=True, text=True
-            )
-            if "relax" not in running_jobs.stdout.lower():
-                print("  Relaxation complete!")
-                return "completed"
-
-        print(f"  Jobs still running... (checking again in {poll_interval}s)")
+        print(
+            f"  {stage_name} jobs still running... "
+            f"({completed}/{expected_chunks} chunks found; checking again in {poll_interval}s)"
+        )
         time.sleep(poll_interval)
 
 
@@ -271,11 +350,20 @@ def collect_relaxation_results(
 
     cmd = [
         "python", str(collect_script),
-        "--results_dir", str(results_dir),
+        "--results_dir", "cell-opt-results",
+        "--log_dir", "cell-opt-logs",
+        "--filter_indices", "filtered_by_inter_bb_indices.npy",
+        "--output_dir", ".",
+        "--formula", formula,
         "--top_n", str(top_n),
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        cwd=str(results_dir),
+    )
     if result.returncode != 0:
         print(f"  Error collecting results: {result.stderr}")
         return {"status": "error", "error": result.stderr}
@@ -307,7 +395,7 @@ def setup_dft_jobs(
     Args:
         formula: Chemical formula.
         base_dir: Base directory.
-        top_n_csv: Path to top-N structures CSV (defaults to <formula>/results/top10_for_dft.csv).
+        top_n_csv: Path to top-N structures XYZ/CSV base path (defaults to <formula>/results/top10_for_dft.xyz).
         functionals: List of DFT functionals to run.
         vasp_settings: Optional VASP settings overrides.
         
@@ -322,14 +410,20 @@ def setup_dft_jobs(
     dft_dir = formula_dir / "dft_jobs"
     dft_dir.mkdir(parents=True, exist_ok=True)
 
-    # Determine input file
+    # Determine input structure file for DFT setup.
     if top_n_csv is None:
-        top_n_csv = formula_dir / "results" / "top10_for_dft.csv"
+        top_n_csv = formula_dir / "results" / "top10_for_dft.xyz"
+        if not top_n_csv.exists():
+            legacy_nested_top_n = formula_dir / "results" / formula / "results" / "top10_for_dft.xyz"
+            if legacy_nested_top_n.exists():
+                top_n_csv = legacy_nested_top_n
     else:
         top_n_csv = Path(top_n_csv)
+        if top_n_csv.suffix == ".csv":
+            top_n_csv = top_n_csv.with_suffix(".xyz")
 
     if not top_n_csv.exists():
-        raise FileNotFoundError(f"Top-N CSV not found: {top_n_csv}")
+        raise FileNotFoundError(f"Top-N XYZ not found: {top_n_csv}")
 
     print(f"  Input: {top_n_csv}")
     print(f"  Output: {dft_dir}")
@@ -341,31 +435,51 @@ def setup_dft_jobs(
     if not dft_setup_script.exists():
         raise FileNotFoundError(f"DFT setup script not found: {dft_setup_script}")
 
-    job_dirs = {}
+    theory_map = {
+        "pbe-d3": "d3",
+        "pbe-mbd": "mbd",
+        "d3": "d3",
+        "mbd": "mbd",
+    }
+    theories = []
+    normalized_functionals = []
     for functional in functionals:
-        func_dir = dft_dir / functional
-        cmd = [
-            "python", str(dft_setup_script),
-            "--input", str(top_n_csv),
-            "--output_dir", str(func_dir),
-            "--functional", functional,
-        ]
+        theory = theory_map.get(functional)
+        if theory is None:
+            raise ValueError(f"Unsupported DFT functional: {functional}")
+        theories.append(theory)
+        normalized_functionals.append(f"pbe-{theory}")
 
-        print(f"\n  Setting up {functional} jobs...")
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
-            print(f"  Error: {result.stderr}")
-            continue
+    cmd = [
+        "python", str(dft_setup_script),
+        "--input", str(top_n_csv),
+        "--output_dir", str(dft_dir),
+        "--formula", formula,
+        "--theories", *theories,
+    ]
 
-        print(result.stdout)
-        job_dirs[functional] = str(func_dir)
+    print(f"\n  Setting up DFT jobs...")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"  Error: {result.stderr}")
+        return {
+            "status": "error",
+            "formula": formula,
+            "dft_dir": str(dft_dir),
+            "job_dirs": {},
+            "functionals": functionals,
+            "error": result.stderr,
+        }
+
+    print(result.stdout)
+    job_dirs = {functional: str(dft_dir / functional) for functional in normalized_functionals}
 
     return {
         "status": "completed",
         "formula": formula,
         "dft_dir": str(dft_dir),
         "job_dirs": job_dirs,
-        "functionals": functionals,
+        "functionals": normalized_functionals,
     }
 
 
@@ -491,10 +605,16 @@ def collect_dft_results(
     if not collect_script.exists():
         raise FileNotFoundError(f"DFT collection script not found: {collect_script}")
 
+    # NOTE: collect_dft_results.py expects --input_dir/-i pointing to the directory
+    # that contains pbe-d3/ and pbe-mbd/ subdirectories (i.e. <formula>/dft_jobs).
+    input_dir = formula_dir / "dft_jobs"
+
     cmd = [
         "python", str(collect_script),
-        "--formula_dir", str(formula_dir),
+        "--input_dir", str(input_dir),
+        "--output_dir", str(formula_dir),
         "--top_n", str(top_n_structures),
+        "--formula", formula,
     ]
 
     if generate_plot:
@@ -511,8 +631,9 @@ def collect_dft_results(
         if default_umlip.exists():
             cmd.extend(["--umlip_results", str(default_umlip)])
 
-    if extract_structures:
-        cmd.append("--extract_structures")
+    # collect_dft_results.py extracts structures by default; disable with --no_structures
+    if not extract_structures:
+        cmd.append("--no_structures")
 
     print(f"  Command: {' '.join(cmd)}")
 
@@ -691,13 +812,13 @@ Examples:
   python csp_pipeline.py --xyz molecule.xyz --ckpt_path /path/to/ckpt --generate
 
   # Step 2: Submit relaxation (after generation)
-  python csp_pipeline.py --formula C6H6 --relax
+  python csp_pipeline.py --formula C9H9N3O5 --relax
 
   # Step 3: Setup DFT jobs (after relaxation)
-  python csp_pipeline.py --formula C6H6 --setup_dft
+  python csp_pipeline.py --formula C9H9N3O5 --setup_dft
 
   # Step 4: Collect DFT results (after DFT jobs complete)
-  python csp_pipeline.py --formula C6H6 --collect_dft --plot
+  python csp_pipeline.py --formula C9H9N3O5 --collect_dft --plot
 
 Output Structure:
   <formula>/
@@ -833,7 +954,7 @@ Output Structure:
         )
 
     elif args.relax:
-        submit_relaxation(
+        relax_result = submit_relaxation(
             formula=args.formula,
             base_dir=args.output_dir,
             num_jobs=args.num_relax_jobs,
@@ -844,7 +965,7 @@ Output Structure:
             wait_for_completion=args.wait,
             poll_interval=args.poll_interval,
         )
-        if args.wait:
+        if args.wait and relax_result.get("status") == "completed":
             collect_relaxation_results(
                 formula=args.formula,
                 base_dir=args.output_dir,

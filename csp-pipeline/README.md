@@ -13,13 +13,18 @@ molecule.xyz (input conformer)
         ↓
     [2. UMA-OMC Relaxation]
         ↓
-<formula>/results/top10_for_dft.csv
+<formula>/results/top10_for_dft.xyz
         ↓
     [3. DFT Validation (PBE-D3 & PBE-MBD)]
         ↓
 <formula>/dft_combined_ranking.csv
 <formula>/stability_ranking_<formula>.pdf
 <formula>/relaxed_structures/
+
+Note:
+- UMA-OMC relaxation outputs live under `<formula>/results/`. In some current runs you may see an extra nested path like
+  `<formula>/results/<formula>/results/` (this is produced by the underlying relaxation scripts and is where the relaxed outputs are found).
+- `<formula>/relaxed_structures/` is only created after DFT result collection when `--extract_structures` is used.
 ```
 
 ## Directory Structure
@@ -28,7 +33,7 @@ molecule.xyz (input conformer)
 csp-pipeline-demo/
 ├── csp_pipeline.py              # High-level pipeline orchestrator
 │
-├── molcrystalflow-gen/          # MolCrystalFlow generation module
+├── molcrystalflow_gen/          # MolCrystalFlow generation module
 │   ├── __init__.py
 │   ├── packing_gen.py           # Core packing generation logic
 │   └── utility_scripts/
@@ -49,7 +54,7 @@ csp-pipeline-demo/
 │   ├── generated/               # MolCrystalFlow outputs
 │   ├── results/                 # UMA-OMC relaxation results
 │   ├── dft_jobs/                # DFT job directories
-│   ├── relaxed_structures/      # Extracted DFT-relaxed structures
+│   ├── relaxed_structures/      # (Created after DFT collection) extracted DFT-relaxed structures
 │   ├── dft_combined_ranking.csv # Final ranking
 │   └── stability_ranking_<formula>.pdf
 
@@ -110,49 +115,101 @@ Output: `<formula>/generated/pred_combined.xyz`
 #### Step 2: UMA-OMC Relaxation
 
 ```bash
-cd uma-s1p1-omc-opt
+# High-level entrypoint
+python csp_pipeline.py --formula <FORMULA> --relax --wait
 
-# Run relaxation pipeline (from generated structures)
-python run_relaxation_pipeline.py \
-    --input ../<formula>/generated/pred_combined.xyz \
-    --output_dir ../<formula>/results \
-    --num_jobs 100 \
-    --structures_per_job 50
-
-# Or submit the monitor job
-sbatch submit_monitor.sh
+# Without --wait, only rigid-body jobs are submitted.
+python csp_pipeline.py --formula <FORMULA> --relax
 ```
 
-Output: `<formula>/results/top10_for_dft.csv`
+Output:
+- `<formula>/results/top10_for_dft.xyz`
+- `<formula>/results/top10_for_dft.csv`
+
+What `csp_pipeline.py --relax` does now:
+- It runs `uma-s1p1-omc-opt/run_relaxation_pipeline.py submit_rigid_body` from `<formula>/results/`.
+- That step auto-generates `submit_rigid_body_opt_generated.sh` in `<formula>/results/` and submits it with `sbatch`.
+- If you also pass `--wait`, the pipeline waits for rigid-body chunk outputs, runs `combine_and_filter`, then runs `submit_cell_opt`.
+- The cell-opt step auto-generates `submit_cell_opt_generated.sh` in `<formula>/results/` and submits that with `sbatch`.
+- After cell-opt completes, `csp_pipeline.py` collects the results into `<formula>/results/cell_opt_all_results.csv` and `<formula>/results/top10_for_dft.csv`.
+
+Notes:
+- `--structures_per_job` maps to the rigid-body `chunk_size`.
+- The current UMA-OMC stepwise CLI derives the number of jobs from input size and chunk size, so `--num_relax_jobs` is currently informational rather than enforced.
+- The current underlying UMA-OMC scripts do not yet consume the high-level `--relax_conda_env`, `--relax_partition`, or `--relax_time` flags.
+
+If you want to run the UMA step manually instead of through `csp_pipeline.py`, use:
+
+```bash
+cd <FORMULA>/results
+
+# 1. Submit rigid-body jobs
+python ../../uma-s1p1-omc-opt/run_relaxation_pipeline.py submit_rigid_body \
+    --input ../generated/pred_combined.xyz \
+    --chunk_size 50
+
+# 2. After rigid-body finishes
+python ../../uma-s1p1-omc-opt/run_relaxation_pipeline.py combine_and_filter --min_dist 1.0
+
+# 3. Submit cell optimization jobs
+python ../../uma-s1p1-omc-opt/run_relaxation_pipeline.py submit_cell_opt \
+    --input filtered_by_inter_bb.xyz \
+    --chunk_size 10
+
+# 4. After cell-opt finishes, collect results
+python ../../uma-s1p1-omc-opt/collect_relaxation_results.py \
+    --results_dir cell-opt-results \
+    --log_dir cell-opt-logs \
+    --filter_indices filtered_by_inter_bb_indices.npy \
+    --output_dir . \
+    --formula <FORMULA> \
+    --top_n 10
+```
 
 #### Step 3: DFT Validation
 
 ```bash
-cd dft-run
+# High-level entrypoint
+python csp_pipeline.py --formula <FORMULA> --setup_dft
 
-# Setup DFT jobs (PBE-D3 and PBE-MBD)
-python setup_dft_jobs.py \
-    --input ../<formula>/results/top10_for_dft.csv \
-    --output_dir ../<formula>/dft_jobs
+# Submit all generated DFT jobs
+python csp_pipeline.py --formula <FORMULA> --submit_dft
 
-# Submit jobs
-cd ../<formula>/dft_jobs
-for d in pbe-d3/structure_* pbe-mbd/structure_*; do
-    cd $d && sbatch submit.sh && cd ..
-done
+# Or submit and wait for completion
+python csp_pipeline.py --formula <FORMULA> --submit_dft --wait
 
 # After completion, collect results and generate plots
-cd ../..
-python dft-run/collect_dft_results.py \
-    --formula_dir <formula> \
-    --plot \
-    --extract_structures
+python csp_pipeline.py --formula <FORMULA> --collect_dft --plot
+
+# Structures are extracted by default during --collect_dft.
+# To skip generating <formula>/relaxed_structures/, add: --no_structures
 ```
 
 Output: 
 - `<formula>/dft_combined_ranking.csv`
 - `<formula>/stability_ranking_<formula>.pdf`
-- `<formula>/relaxed_structures/`
+- `<formula>/relaxed_structures/` (created by default during DFT result collection; disable with --no_structures)
+
+What `csp_pipeline.py --setup_dft` does now:
+- It uses `<formula>/results/top10_for_dft.xyz` as the structure input for DFT setup.
+- It passes the single-molecule formula explicitly, so job names stay as `<FORMULA>` rather than auto-detecting the full unit-cell composition.
+- It calls `dft-run/setup_dft_jobs.py` once with `--theories d3 mbd`.
+- That script creates `<formula>/dft_jobs/pbe-d3/`, `<formula>/dft_jobs/pbe-mbd/`, and `<formula>/dft_jobs/submit_all_dft.sh`.
+
+If you want to run the DFT setup manually instead of through `csp_pipeline.py`, use:
+
+```bash
+cd dft-run
+
+python setup_dft_jobs.py \
+    --input ../<FORMULA>/results/top10_for_dft.xyz \
+    --output_dir ../<FORMULA>/dft_jobs \
+    --formula <FORMULA> \
+    --theories d3 mbd
+
+cd ../<FORMULA>/dft_jobs
+bash submit_all_dft.sh
+```
 
 ## Example: C9H9N3O5
 
@@ -178,7 +235,7 @@ python csp_pipeline.py --formula C9H9N3O5 --submit_dft --wait
 
 # 4. Collect results and plot
 python csp_pipeline.py --formula C9H9N3O5 --collect_dft --plot \
-    --gt_energies 3rd-csp-competition-ground-truth/gt_energies.json
+     --gt_energies 3rd-csp-competition-ground-truth/gt_energies.json
 ```
 
 ## Pipeline Steps Detail
@@ -193,11 +250,13 @@ python csp_pipeline.py --formula C9H9N3O5 --collect_dft --plot \
 - **Inter-BB filtering**: Remove structures with overlapping molecules
 - **Cell optimization**: Full cell + atomic relaxation with UMA-OMC
 - **Ranking**: Sort by predicted energy, extract top-N for DFT
+- **Submission scripts**: `submit_rigid_body_opt_generated.sh` and `submit_cell_opt_generated.sh` are generated inside `<formula>/results/` when the corresponding steps are submitted
 
 ### 3. DFT Validation
 - **PBE-D3(BJ)**: Fast dispersion-corrected DFT
 - **PBE-MBD**: Accurate many-body dispersion for molecular crystals
 - **Ranking**: Final energy-based ranking for CSP competition
+- **Setup input**: DFT setup consumes `top10_for_dft.xyz` and uses the molecular formula supplied by `csp_pipeline.py` for naming
 
 ## Output Files
 
@@ -206,25 +265,29 @@ python csp_pipeline.py --formula C9H9N3O5 --collect_dft --plot \
 | `<formula>/molecule.xyz` | Input molecule conformer |
 | `<formula>/generated/crystals_z*.xyz` | Generated structures by Z value |
 | `<formula>/generated/pred_combined.xyz` | All generated structures |
-| `<formula>/results/relaxation_results.csv` | All relaxed structures with metadata |
+| `<formula>/results/submit_rigid_body_opt_generated.sh` | Auto-generated SLURM array script for rigid-body UMA-OMC jobs |
+| `<formula>/results/submit_cell_opt_generated.sh` | Auto-generated SLURM array script for cell-opt UMA-OMC jobs |
+| `<formula>/results/cell_opt_all_results.csv` | All relaxed structures with metadata |
+| `<formula>/results/top10_for_dft.xyz` | Top 10 relaxed structures for DFT setup |
 | `<formula>/results/top10_for_dft.csv` | Top 10 for DFT validation |
 | `<formula>/dft_jobs/pbe-d3/` | PBE-D3 job directories |
 | `<formula>/dft_jobs/pbe-mbd/` | PBE-MBD job directories |
+| `<formula>/dft_jobs/submit_all_dft.sh` | Master script to submit all generated DFT jobs |
 | `<formula>/dft_combined_ranking.csv` | Final DFT rankings |
 | `<formula>/stability_ranking_<formula>.pdf` | Stability ranking plot |
-| `<formula>/relaxed_structures/` | Extracted DFT-relaxed structures |
+| `<formula>/relaxed_structures/` | (Created after DFT collection) Extracted DFT-relaxed structures |
 
 ## Code Organization
 
 ### csp_pipeline.py (High-Level Orchestrator)
 The main entry point that coordinates all pipeline steps:
 - `run_generation()` - Step 1: MolCrystalFlow structure generation
-- `submit_relaxation()` - Step 2: UMA-OMC relaxation submission
+- `submit_relaxation()` - Step 2: UMA-OMC stepwise submission and optional waiting/collection
 - `setup_dft_jobs()` - Step 3: DFT job preparation
 - `collect_dft_results()` - Step 4: Result collection and ranking
 - `run_full_pipeline()` - Run all steps in sequence
 
-### molcrystalflow-gen/packing_gen.py (Generation Module)
+### molcrystalflow_gen/packing_gen.py (Generation Module)
 Core packing generation logic:
 - `generate_crystal_structures()` - High-level generation function
 - `load_model()` - Load MolCrystalFlow checkpoint

@@ -52,6 +52,8 @@ import numpy as np
 from ase.geometry import get_distances
 from ase.io import read, write
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+
 
 # ==============================================================================
 # Step 1: Combine Input XYZ Files
@@ -103,6 +105,8 @@ def generate_rigid_body_submit_script(
     """Generate SLURM submission script for rigid-body optimization."""
     num_chunks = (total_structures + chunk_size - 1) // chunk_size
     
+    optimize_batch_script = SCRIPT_DIR / "optimize_batch.py"
+
     script = f"""#!/bin/bash
 #SBATCH --output=slurmoutputs/R-%x.%j.out
 #SBATCH --error=slurmoutputs/R-%x.%j.err
@@ -124,7 +128,7 @@ pwd; hostname; date
 START=$((0 + SLURM_ARRAY_TASK_ID * {chunk_size}))
 END=$(( START + {chunk_size}))
 
-python optimize_batch.py --start $START --end $END --input {input_xyz}
+python {optimize_batch_script} --start $START --end $END --input {input_xyz}
 """
     return script, num_chunks
 
@@ -390,6 +394,8 @@ def generate_cell_opt_submit_script(
     """Generate SLURM submission script for cell optimization."""
     num_chunks = (total_structures + chunk_size - 1) // chunk_size
     
+    cell_opt_script = SCRIPT_DIR / "cell_opt_optimize_batch.py"
+
     script = f"""#!/bin/bash
 #SBATCH --output=slurmoutputs/R-%x.%j.out
 #SBATCH --error=slurmoutputs/R-%x.%j.err
@@ -411,7 +417,7 @@ pwd; hostname; date
 START=$((0 + SLURM_ARRAY_TASK_ID * {chunk_size}))
 END=$(( START + {chunk_size}))
 
-python cell_opt_optimize_batch.py --start $START --end $END --input {input_xyz}
+python {cell_opt_script} --start $START --end $END --input {input_xyz}
 """
     return script, num_chunks
 
