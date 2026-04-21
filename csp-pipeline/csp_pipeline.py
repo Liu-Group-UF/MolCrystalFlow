@@ -850,10 +850,10 @@ Output Structure:
     # Generation settings
     gen_group = parser.add_argument_group("Generation Settings")
     gen_group.add_argument("--z_values", type=int, nargs="+", default=[2, 4], help="Z values")
-    gen_group.add_argument("--num_samples", "-n", type=int, default=1000, help="Samples per Z value")
+    gen_group.add_argument("--num_samples", "-n", type=int, default=100, help="Samples per Z value")
     gen_group.add_argument("--axis_flip", action="store_true", default=True, help="Enable axis flip")
     gen_group.add_argument("--no_axis_flip", action="store_false", dest="axis_flip", help="Disable axis flip")
-    gen_group.add_argument("--filter_overlap", action="store_true", default=True, help="Filter by overlap")
+    gen_group.add_argument("--filter_overlap", action="store_true", default=False, help="Filter by overlap")
     gen_group.add_argument("--no_filter_overlap", action="store_false", dest="filter_overlap")
     gen_group.add_argument("--overlap_threshold", type=float, default=0.05, help="Overlap threshold")
     gen_group.add_argument("--timesteps", type=int, default=50, help="Integration timesteps")
