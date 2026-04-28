@@ -29,6 +29,7 @@ XDATCAR
 EIGENVAL
 PROCAR
 DOSCAR
+CHG
 CHGCAR
 WAVECAR
 IBZKPT
@@ -53,3 +54,9 @@ slurm-*.out
 *_WAVECAR
 *_CHGCAR
 npt/
+
+# Model checkpoints
+model-checkpoints/
+
+# Preprocessed datasets
+data-preprocess/*/preprocessed/

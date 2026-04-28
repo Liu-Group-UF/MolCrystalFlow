@@ -42,21 +42,27 @@ mamba activate molcrystalflow
 
 ### Download preprocessed datasets
 
-The two preprocessed datasets can be downloaded as ZIP archives:
+The two preprocessed datasets can be downloaded as ZIP archives and extracted into `data-preprocess/`:
 
 ```bash
-wget -P data-preprocess/thurlemann23/ https://zenodo.org/record/19673190/files/thurlemann23.zip
-wget -P data-preprocess/omc25-mcf/ https://zenodo.org/record/19673190/files/omc25-mcf.zip
+wget -P data-preprocess/ https://zenodo.org/record/19673190/files/thurlemann23.zip
+wget -P data-preprocess/ https://zenodo.org/record/19673190/files/omc25-mcf.zip
+unzip data-preprocess/thurlemann23.zip -d data-preprocess/
+unzip data-preprocess/omc25-mcf.zip -d data-preprocess/
 ```
+
+After extracting, the preprocessed files will be available under:
+- `data-preprocess/thurlemann23/preprocessed/` — Thürlemann dataset
+- `data-preprocess/omc25-mcf/preprocessed/` — OMC25-MCF dataset
 
 ### Download model checkpoints
 
 ```bash
-mkdir -p checkpoints
-wget -P checkpoints/ https://zenodo.org/record/19673190/files/model-checkpoints.zip
+wget https://zenodo.org/record/19673190/files/model-checkpoints.zip
+unzip model-checkpoints.zip
 ```
 
-After downloading, unzip into the repository root, so the checkpoints live under `model-checkpoints/`.
+After extracting, the checkpoints will be available under:
 
 Pre-trained checkpoints with the lowest validation losses are provided in:
 - `model-checkpoints/thurlemann23/` - trained on the Thürlemann dataset
