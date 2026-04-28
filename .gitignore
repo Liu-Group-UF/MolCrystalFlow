@@ -55,8 +55,24 @@ slurm-*.out
 *_CHGCAR
 npt/
 
+# VASP job submission scripts
+run_vasp.slurm
+submit_all*.sh
+submit_cell*.sh
+submit_rigid_body*.sh
+run_*.sh
+*.err
+*.out
+
 # Model checkpoints
 model-checkpoints/
 
 # Preprocessed datasets
 data-preprocess/*/preprocessed/
+
+# Training and inference outputs
+runs/
+inference_outputs/
+
+# Codex
+.codex
