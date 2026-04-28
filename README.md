@@ -45,9 +45,8 @@ mamba activate molcrystalflow
 The two preprocessed datasets can be downloaded as ZIP archives:
 
 ```bash
-mkdir -p checkpoints
-wget -P checkpoints/ https://zenodo.org/record/19673190/files/thurlemann23.zip
-wget -P checkpoints/ https://zenodo.org/record/19673190/files/omc25-mcf.zip
+wget -P data-preprocess/thurlemann23/ https://zenodo.org/record/19673190/files/thurlemann23.zip
+wget -P data-preprocess/omc25-mcf/ https://zenodo.org/record/19673190/files/omc25-mcf.zip
 ```
 
 ### Download model checkpoints
